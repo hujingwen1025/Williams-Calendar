@@ -1,0 +1,22 @@
+[
+ {
+  "scope": "app",
+  "shape": "app screen",
+  "theme": "studio",
+  "axes": "light/roman-serif/warm",
+  "nav": "calendar top bar",
+  "signature": "privacy-aware shared timeline",
+  "imagery": "the working calendar",
+  "photos": [],
+  "sections": [
+   "calendar",
+   "event details",
+   "owner settings"
+  ],
+  "waived": [],
+  "prompt": "Read-only public calendar with two incoming ICS sources, password-protected details, persistent SQLite and Docker",
+  "verification": "0 FAIL, 0 REFLEX, 0 WARN; fresh-context finish review, 3 resolved",
+  "date": "2026-11-09",
+  "mode": "build"
+ }
+]

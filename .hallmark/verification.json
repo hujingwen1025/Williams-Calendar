@@ -1,0 +1,49 @@
+{
+  "date": "2026-11-09",
+  "backendTests": 31,
+  "browserTests": 5,
+  "productionBuild": "pass",
+  "docker": {
+    "build": "pass",
+    "nonRootUid": 1000,
+    "health": "pass",
+    "ownerLogin": "pass",
+    "persistentVolumeRecreation": "pass",
+    "onlineBackup": "pass"
+  },
+  "hallmark": {
+    "summary": {
+      "fails": 0,
+      "reflex": 0,
+      "warns": 0,
+      "waived": 0,
+      "rejected": 0,
+      "answered": 0,
+      "dismissed": 0,
+      "notes": 0,
+      "files": 9,
+      "render": "ran"
+    },
+    "findings": []
+  },
+  "finishReview": {
+    "reviewer": "fresh-context subagent",
+    "verdict": "fix",
+    "findings": [
+      {
+        "finding": "Month event times missing",
+        "outcome": "resolved: render allowed event start and end explicitly; browser asserts visibility"
+      },
+      {
+        "finding": "Narrow month event labels truncate",
+        "outcome": "resolved: compact time intervals on phones; initial mobile view is Agenda"
+      },
+      {
+        "finding": "Mobile functional time text below 11px",
+        "outcome": "resolved: time labels use 11px minimum"
+      }
+    ]
+  },
+  "sourceFeeds": "not configured; supplied later through owner settings",
+  "screenshots": "ignored local .hallmark/shots; populated captures use isolated test fixtures only"
+}

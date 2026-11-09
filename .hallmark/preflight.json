@@ -1,0 +1,16 @@
+{
+  "scanned": "2026-11-09",
+  "findings": {
+    "existing": "README.md:1 and LICENSE only",
+    "framework": "React + Vite + Fastify introduced",
+    "fonts": "Hedvig Letters Serif and Geist",
+    "palette": "Hallmark Studio"
+  },
+  "preserve": ["repository license"],
+  "introduce": [
+    "Studio app-screen tokens",
+    "read-only calendar workbench",
+    "server-enforced privacy"
+  ],
+  "source": "https://github.com/Nutlope/hallmark/tree/main/skills/hallmark"
+}

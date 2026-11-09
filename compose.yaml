@@ -1,0 +1,25 @@
+services:
+  calendar:
+    build: .
+    init: true
+    restart: unless-stopped
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-3000}:3000"
+    environment:
+      APP_ORIGIN: "${APP_ORIGIN:-http://localhost:3000}"
+      OWNER_PASSWORD: "${OWNER_PASSWORD:?Set the initial OWNER_PASSWORD in .env}"
+      ENCRYPTION_KEY: "${ENCRYPTION_KEY:?Set ENCRYPTION_KEY in .env}"
+      ALLOW_PRIVATE_SOURCES: "${ALLOW_PRIVATE_SOURCES:-false}"
+      TZ: UTC
+    volumes:
+      - calendar-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    stop_grace_period: 40s
+volumes:
+  calendar-data:
