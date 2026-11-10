@@ -44,6 +44,7 @@ import {
   Check,
   ZoomIn,
   ZoomOut,
+  MoreHorizontal,
 } from "lucide-react";
 import type {
   CalendarEvent,
@@ -51,6 +52,7 @@ import type {
   SessionInfo,
 } from "../shared/types";
 import { api, post, setCsrf } from "./api";
+import { useMediaQuery } from "./useMediaQuery";
 import { Dialog } from "./components/Dialog";
 import { Login } from "./components/Login";
 import { Settings } from "./components/Settings";
@@ -109,7 +111,11 @@ function validDate(date: string | null) {
     return undefined;
   }
 }
+const PHONE_QUERY =
+  "(max-width: 640px), (max-width: 950px) and (max-height: 500px)";
 export function App() {
+  const isPhone = useMediaQuery(PHONE_QUERY);
+  const compactDetails = useMediaQuery("(max-width: 950px)");
   const calendar = useRef<CalendarRef>(null);
   const calendarSheet = useRef<HTMLElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -120,7 +126,7 @@ export function App() {
   const [view, setView] = useState(() =>
     views.some((v) => v.id === initial.get("view"))
       ? initial.get("view")!
-      : matchMedia("(max-width: 640px)").matches
+      : matchMedia(PHONE_QUERY).matches
         ? "listMonth"
         : "dayGridMonth",
   );
@@ -143,7 +149,7 @@ export function App() {
   );
   const [selected, setSelected] = useState<CalendarEvent | null>(null);
   const [modal, setModal] = useState<
-    "viewer" | "owner" | "settings" | "help" | "preferences" | null
+    "viewer" | "owner" | "settings" | "help" | "preferences" | "options" | null
   >(null);
   const [preview, setPreview] = useState(false);
   const [revision, setRevision] = useState(0);
@@ -156,6 +162,7 @@ export function App() {
   const weekStart = preferences.weekStart ?? session?.settings.weekStart ?? 1;
   const zoom = preferences.zoom;
   const isTimeline = ["timeGridDay", "timeGridWeek", "workWeek"].includes(view);
+  const isPannableWeek = isPhone && ["timeGridWeek", "workWeek"].includes(view);
   const setZoom = useCalendarZoom(
     calendarSheet,
     zoom,
@@ -315,6 +322,7 @@ export function App() {
         event.metaKey ||
         event.altKey ||
         modal ||
+        Boolean(document.querySelector("dialog[open]")) ||
         /^(INPUT|TEXTAREA|SELECT)$/.test(
           (event.target as HTMLElement).tagName,
         ) ||
@@ -322,6 +330,13 @@ export function App() {
       )
         return;
       const key = event.key.toLowerCase();
+      if (
+        ["arrowleft", "arrowright"].includes(key) &&
+        (event.target as HTMLElement).closest(
+          '.calendar-pan-frame[data-pannable="true"]',
+        )
+      )
+        return;
       if (["+", "=", "-", "_", "0"].includes(key)) {
         event.preventDefault();
         setZoom(
@@ -654,7 +669,14 @@ export function App() {
                   </button>
                 </div>
                 <button
-                  className="icon-button"
+                  className="button quiet mobile-options-button"
+                  aria-label="Calendar options"
+                  onClick={() => setModal("options")}
+                >
+                  <MoreHorizontal size={20} /> Options
+                </button>
+                <button
+                  className="icon-button desktop-utility"
                   aria-label="Display preferences"
                   title="Display preferences"
                   onClick={() => setModal("preferences")}
@@ -662,7 +684,7 @@ export function App() {
                   <SlidersHorizontal size={18} />
                 </button>
                 <button
-                  className="icon-button"
+                  className="icon-button desktop-utility"
                   aria-label="Print calendar"
                   title="Print calendar"
                   onClick={() => window.print()}
@@ -775,8 +797,13 @@ export function App() {
                 </span>
               </div>
             )}
+            {isPannableWeek && (
+              <p className="calendar-pan-hint">
+                Swipe sideways for more days. Pinch to stretch events.
+              </p>
+            )}
             <div
-              className={`calendar-layout ${selected ? "with-details" : ""}`}
+              className={`calendar-layout ${selected && !compactDetails ? "with-details" : ""}`}
             >
               <section
                 ref={calendarSheet}
@@ -793,125 +820,147 @@ export function App() {
                     <span className="visually-hidden">Loading calendar…</span>
                   </div>
                 )}
-                <FullCalendar
-                  ref={calendar}
-                  plugins={plugins}
-                  initialView={view}
-                  initialDate={anchorDate || today}
-                  views={{
-                    workWeek: { type: "timeGridWeek", hiddenDays: [0, 6] },
-                  }}
-                  headerToolbar={false}
-                  events={calendarEvents}
-                  timeZone={timeZone}
-                  firstDay={weekStart}
-                  weekends={preferences.weekends}
-                  nowIndicator
-                  displayEventTime
-                  displayEventEnd
-                  navLinks
-                  now={now}
-                  editable={false}
-                  selectable={false}
-                  datesSet={datesChanged}
-                  height={
-                    view === "multiMonthYear" || isList
-                      ? "auto"
-                      : isTimeline
-                        ? 650
-                        : Math.round((650 * zoom) / 100)
+                <div
+                  className="calendar-pan-frame"
+                  onScroll={(event) =>
+                    event.currentTarget.style.setProperty(
+                      "--calendar-pan-offset",
+                      `${event.currentTarget.scrollLeft}px`,
+                    )
                   }
-                  slotMinHeight={Math.round((32 * zoom) / 100)}
-                  eventMinHeight={18}
-                  eventShortHeight={42}
-                  scrollTimeReset={false}
-                  singleMonthMinWidth={Math.round((320 * zoom) / 100)}
-                  dayCellInnerClass="calendar-day-inner"
-                  dayMaxEvents={zoom > 100 ? false : zoom === 100 ? 3 : true}
-                  fixedWeekCount={false}
-                  businessHours={{
-                    daysOfWeek: [1, 2, 3, 4, 5],
-                    startTime: session.settings.workStart,
-                    endTime: session.settings.workEnd,
-                  }}
-                  scrollTime={`${session.settings.workStart}:00`}
-                  eventTimeFormat={{
-                    hour: "numeric",
-                    minute: "2-digit",
-                    hour12: preferences.hour12,
-                  }}
-                  slotHeaderFormat={{
-                    hour: "numeric",
-                    minute: "2-digit",
-                    hour12: preferences.hour12,
-                  }}
-                  eventClick={(info) => {
-                    const event = data?.events.find(
-                      (event) => event.id === info.event.id,
-                    );
-                    if (event) setSelected(event);
-                  }}
-                  dateClick={(info) => {
-                    calendar.current
-                      ?.getApi()
-                      .changeView("timeGridDay", info.dateStr);
-                    setView("timeGridDay");
-                  }}
-                  eventClass={(info) =>
-                    [
-                      "calendar-event",
-                      info.event.extendedProps.record?.redacted
-                        ? "busy-event"
-                        : "detail-event",
-                      !info.event.extendedProps.record?.redacted &&
-                      info.event.extendedProps.record?.availability === "free"
-                        ? "free-event"
-                        : "",
-                      info.event.id === selected?.id ? "event-selected" : "",
-                    ].join(" ")
+                  data-pannable={isPannableWeek}
+                  tabIndex={isPannableWeek ? 0 : undefined}
+                  role={isPannableWeek ? "region" : undefined}
+                  aria-label={
+                    isPannableWeek ? "Scrollable week calendar" : undefined
                   }
-                  dayCellClass="calendar-day"
-                  dayCellTopClass="calendar-day-top"
-                  dayCellTopInnerClass="calendar-day-number"
-                  dayHeaderClass="calendar-day-header"
-                  tableClass="calendar-table"
-                  listItemEventClass="calendar-agenda-event"
-                  singleMonthClass="calendar-year-month"
-                  singleMonthHeaderClass="calendar-year-header"
-                  eventBeforeClass="calendar-event-before"
-                  eventInnerClass="calendar-event-inner"
-                  eventContent={(info) => (
-                    <CalendarEventContent
-                      info={info}
-                      timeZone={timeZone}
-                      hour12={preferences.hour12}
-                      expanded={zoom >= 150}
-                    />
-                  )}
-                  noEventsContent={() => (
-                    <div className="agenda-empty">
-                      <CalendarDays size={28} strokeWidth={1.3} />
-                      <h2>
-                        {!hasSource
-                          ? "The calendar is taking shape."
-                          : !available
-                            ? "Calendar data is unavailable."
-                            : search || filter !== "all"
-                              ? "No matching events."
-                              : "A little room in the schedule."}
-                      </h2>
-                      <p>
-                        {!hasSource
-                          ? "The owner hasn’t connected this calendar source yet."
-                          : !available
-                            ? "The source has not completed a successful sync."
-                            : search || filter !== "all"
-                              ? "Try a different search or filter."
-                              : "There are no events in this date range."}
-                      </p>
-                    </div>
-                  )}
-                />
+                >
+                  <FullCalendar
+                    ref={calendar}
+                    plugins={plugins}
+                    initialView={view}
+                    initialDate={anchorDate || today}
+                    views={{
+                      workWeek: { type: "timeGridWeek", hiddenDays: [0, 6] },
+                    }}
+                    headerToolbar={false}
+                    events={calendarEvents}
+                    timeZone={timeZone}
+                    firstDay={weekStart}
+                    weekends={preferences.weekends}
+                    nowIndicator
+                    displayEventTime
+                    displayEventEnd
+                    navLinks
+                    now={now}
+                    editable={false}
+                    selectable={false}
+                    datesSet={datesChanged}
+                    height={
+                      view === "multiMonthYear" || isList
+                        ? "auto"
+                        : isTimeline
+                          ? isPhone
+                            ? 560
+                            : 650
+                          : Math.round((650 * zoom) / 100)
+                    }
+                    slotMinHeight={Math.round((32 * zoom) / 100)}
+                    eventMinHeight={18}
+                    eventShortHeight={42}
+                    scrollTimeReset={false}
+                    singleMonthMinWidth={
+                      isPhone ? 250 : Math.round((320 * zoom) / 100)
+                    }
+                    dayCellInnerClass="calendar-day-inner"
+                    dayMaxEvents={zoom > 100 ? false : zoom === 100 ? 3 : true}
+                    fixedWeekCount={false}
+                    businessHours={{
+                      daysOfWeek: [1, 2, 3, 4, 5],
+                      startTime: session.settings.workStart,
+                      endTime: session.settings.workEnd,
+                    }}
+                    scrollTime={`${session.settings.workStart}:00`}
+                    eventTimeFormat={{
+                      hour: "numeric",
+                      minute: "2-digit",
+                      hour12: preferences.hour12,
+                    }}
+                    slotHeaderFormat={{
+                      hour: "numeric",
+                      minute: "2-digit",
+                      hour12: preferences.hour12,
+                    }}
+                    eventClick={(info) => {
+                      const event = data?.events.find(
+                        (event) => event.id === info.event.id,
+                      );
+                      if (event) setSelected(event);
+                    }}
+                    dateClick={(info) => {
+                      calendar.current
+                        ?.getApi()
+                        .changeView("timeGridDay", info.dateStr);
+                      setView("timeGridDay");
+                    }}
+                    eventClass={(info) =>
+                      [
+                        "calendar-event",
+                        info.event.extendedProps.record?.redacted
+                          ? "busy-event"
+                          : "detail-event",
+                        !info.event.extendedProps.record?.redacted &&
+                        info.event.extendedProps.record?.availability === "free"
+                          ? "free-event"
+                          : "",
+                        info.event.id === selected?.id ? "event-selected" : "",
+                      ].join(" ")
+                    }
+                    dayCellClass="calendar-day"
+                    dayCellTopClass="calendar-day-top"
+                    dayCellTopInnerClass="calendar-day-number"
+                    dayHeaderClass="calendar-day-header"
+                    slotHeaderClass="calendar-slot-header"
+                    allDayHeaderClass="calendar-all-day-header"
+                    tableClass="calendar-table"
+                    listItemEventClass="calendar-agenda-event"
+                    singleMonthClass="calendar-year-month"
+                    singleMonthHeaderClass="calendar-year-header"
+                    eventBeforeClass="calendar-event-before"
+                    eventInnerClass="calendar-event-inner"
+                    eventContent={(info) => (
+                      <CalendarEventContent
+                        info={info}
+                        timeZone={timeZone}
+                        hour12={preferences.hour12}
+                        expanded={zoom >= 150}
+                      />
+                    )}
+                    noEventsContent={() => (
+                      <div className="agenda-empty">
+                        <CalendarDays size={28} strokeWidth={1.3} />
+                        <h2>
+                          {!hasSource
+                            ? "The calendar is taking shape."
+                            : !available
+                              ? "Calendar data is unavailable."
+                              : search || filter !== "all"
+                                ? "No matching events."
+                                : "A little room in the schedule."}
+                        </h2>
+                        <p>
+                          {!hasSource
+                            ? "The owner hasn’t connected this calendar source yet."
+                            : !available
+                              ? "The source has not completed a successful sync."
+                              : search || filter !== "all"
+                                ? "Try a different search or filter."
+                                : "There are no events in this date range."}
+                        </p>
+                      </div>
+                    )}
+                  />
+                </div>
                 {!loading &&
                   !error &&
                   (!hasSource || !available) &&
@@ -976,7 +1025,11 @@ export function App() {
                   timeZone={timeZone}
                   hour12={preferences.hour12}
                   onClose={() => setSelected(null)}
-                  onUnlock={() => setModal("viewer")}
+                  compact={compactDetails}
+                  onUnlock={() => {
+                    setSelected(null);
+                    setModal("viewer");
+                  }}
                   canUnlock={actualRole === "public" && session.viewerEnabled}
                 />
               )}
@@ -1037,6 +1090,62 @@ export function App() {
             setFilter("all");
           }}
         />
+      )}
+      {modal === "options" && (
+        <Dialog title="Calendar options" onClose={() => setModal(null)}>
+          <div className="dialog-body mobile-options-body">
+            <label className="form-stack">
+              Go to date
+              <input
+                type="date"
+                aria-label="Go to date"
+                value={anchorDate || today}
+                onChange={(event) => {
+                  if (event.target.value) {
+                    calendar.current?.getApi().gotoDate(event.target.value);
+                    setSelected(null);
+                    setModal(null);
+                  }
+                }}
+              />
+            </label>
+            <p className="options-hint">
+              Pinch the calendar to stretch events, or use the zoom buttons
+              below.
+            </p>
+            <button
+              className="button quiet full-width"
+              onClick={() => setModal("preferences")}
+            >
+              <SlidersHorizontal size={18} /> Display preferences
+            </button>
+            <button
+              className="button quiet full-width"
+              onClick={() => setModal("help")}
+            >
+              <CircleHelp size={18} /> Gestures & keyboard shortcuts
+            </button>
+            <button
+              className="button quiet full-width"
+              onClick={() => {
+                setModal(null);
+                setRevision((value) => value + 1);
+                void loadSession();
+              }}
+            >
+              <RefreshCw size={18} /> Reload calendar
+            </button>
+            <button
+              className="button quiet full-width"
+              onClick={() =>
+                setModal(actualRole === "owner" ? "settings" : "owner")
+              }
+            >
+              <Settings2 size={18} />{" "}
+              {actualRole === "owner" ? "Manage calendar" : "Owner sign-in"}
+            </button>
+          </div>
+        </Dialog>
       )}
       {modal === "help" && (
         <Dialog title="Make yourself at home" onClose={() => setModal(null)}>

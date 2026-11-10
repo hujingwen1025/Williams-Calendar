@@ -15,7 +15,8 @@
     "test:watch": "vitest",
     "admin": "tsx server/cli.ts",
     "setup": "node scripts/setup.mjs",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "test:mobile": "playwright test --config playwright.mobile.config.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.5",

@@ -12,6 +12,7 @@ import {
   Copy,
   Check,
 } from "lucide-react";
+import { Dialog } from "./Dialog";
 import { useState } from "react";
 import { Temporal } from "temporal-polyfill";
 import type { CalendarEvent } from "../../shared/types";
@@ -40,6 +41,7 @@ export function EventDetails({
   onClose,
   onUnlock,
   canUnlock,
+  compact = false,
 }: {
   event: CalendarEvent;
   timeZone: string;
@@ -47,6 +49,7 @@ export function EventDetails({
   onClose: () => void;
   onUnlock: () => void;
   canUnlock: boolean;
+  compact?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState("");
@@ -64,18 +67,20 @@ export function EventDetails({
       );
     }
   }
-  return (
+  const content = (
     <aside className="event-panel" aria-label="Event details">
-      <div className="panel-top">
-        <span className="text-label">Event details</span>
-        <button
-          className="icon-button"
-          aria-label="Close event details"
-          onClick={onClose}
-        >
-          <X size={19} />
-        </button>
-      </div>
+      {!compact && (
+        <div className="panel-top">
+          <span className="text-label">Event details</span>
+          <button
+            className="icon-button"
+            aria-label="Close event details"
+            onClick={onClose}
+          >
+            <X size={19} />
+          </button>
+        </div>
+      )}
       <div className="panel-title">
         <span className="event-rule" />
         <h2>{event.title}</h2>
@@ -178,5 +183,17 @@ export function EventDetails({
         </p>
       )}
     </aside>
+  );
+  return compact ? (
+    <Dialog
+      title="Event details"
+      className="event-details-dialog"
+      closeLabel="Close event details"
+      onClose={onClose}
+    >
+      {content}
+    </Dialog>
+  ) : (
+    content
   );
 }

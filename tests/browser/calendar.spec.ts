@@ -127,6 +127,19 @@ test("owner source settings, test connection, preferences, and public preview", 
     page.getByText(/The source returned a valid calendar/),
   ).toBeVisible();
   await page.getByRole("button", { name: "Preferences", exact: true }).click();
+  await page.setViewportSize({ width: 320, height: 740 });
+  await expect(
+    page.getByRole("button", { name: "Close dialog" }),
+  ).toBeInViewport();
+  await expect(page.getByLabel("Calendar title")).toHaveCSS(
+    "font-size",
+    "16px",
+  );
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
   await page.getByLabel("Calendar title").fill("William’s Shared Calendar");
   await page.getByRole("button", { name: "Save preferences" }).click();
   await expect(
@@ -135,6 +148,15 @@ test("owner source settings, test connection, preferences, and public preview", 
   await page
     .getByRole("button", { name: "Calendar sources", exact: true })
     .click();
+  await expect(
+    page.getByRole("heading", { name: "Public availability", exact: true }),
+  ).toBeVisible();
+  expect(
+    await page
+      .getByRole("dialog")
+      .evaluate((el) => el.scrollWidth <= el.clientWidth),
+  ).toBe(true);
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole("button", { name: "Preview public view" }).click();
   await expect(
     page.getByText("You’re previewing public availability."),
@@ -149,21 +171,55 @@ test("owner source settings, test connection, preferences, and public preview", 
 });
 test("mobile layout stays within the viewport and supports agenda details", async ({
   page,
-}) => {
+}, testInfo) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/?date=2026-11-09");
   await expect(
     page.getByRole("button", { name: "Agenda", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  await login(page);
+  await page.getByRole("button", { name: "View details", exact: true }).click();
+  await expect(page.getByLabel("Calendar password", { exact: true })).toHaveCSS(
+    "font-size",
+    "16px",
+  );
+  await page
+    .getByLabel("Calendar password", { exact: true })
+    .fill("browser-viewer-password");
+  await page.getByRole("checkbox", { name: "Keep me signed in" }).check();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "View details", exact: true })
+    .click();
   await page.getByText("Design review", { exact: true }).click();
-  await expect(page.getByText("Studio 4", { exact: true })).toBeVisible();
+  const details = page.getByRole("dialog", {
+    name: "Event details",
+    exact: true,
+  });
+  await expect(details).toBeVisible();
+  await expect(details.getByText("Studio 4", { exact: true })).toBeInViewport();
+  await expect(
+    details.getByRole("button", { name: "Close event details" }),
+  ).toBeFocused();
+  await page.keyboard.press("Tab");
+  expect(
+    await details.evaluate((el) => el.contains(document.activeElement)),
+  ).toBe(true);
+  await expect(page.locator("html")).toHaveCSS("overflow-y", "hidden");
+  await page.screenshot({
+    path: testInfo.outputPath("mobile-details.png"),
+  });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
   await page.getByRole("button", { name: "Close event details" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("searchbox", { name: "Search events" }).fill("Studio");
+  await expect(page.locator(".calendar-event")).toHaveCount(1);
+  await page.getByLabel("Filter events", { exact: true }).selectOption("busy");
+  await expect(page.locator(".calendar-event")).toHaveCount(1);
+  await page.getByRole("searchbox", { name: "Search events" }).fill("");
   await page.getByRole("button", { name: "Month", exact: true }).click();
   await expect(
     page.locator(".calendar-event .event-time").first(),

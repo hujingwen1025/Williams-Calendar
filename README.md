@@ -87,6 +87,7 @@ Remove the temporary password file afterward. All owner sessions are revoked. No
 - Click an event for permitted details, meeting links, organizer, attendees, recurrence information, and a copyable summary.
 - Authorized search and availability/status filters. Search runs **after privacy redaction**.
 - Named time zones, local-time display, 12/24-hour time, configurable week start, weekend visibility, working-hour shading, and a current-time indicator.
+- Phone layout with agenda-first browsing, compact date/view navigation, a persistent zoom/options dock, readable event sheets, and horizontally scrollable week views. Sign-in, search, filters, display preferences, and owner settings adapt to narrow screens and landscape.
 - Calendar zoom from 50–400% stretches time slots and rows so compressed events have more room. Use the zoom buttons, `+`/`-`/`0` keys (zoom in/out/reset), Ctrl/Cmd + wheel, or pinch over the calendar. Browser page zoom shortcuts remain available. Zoom is saved with your display preferences; authorized location and description previews appear from 150%.
 - Mobile agenda default, keyboard shortcuts (`?` opens the guide), and print styles.
 - Display preferences stay in browser storage; passwords, source credentials, and detailed event data do not.
@@ -126,9 +127,11 @@ npm test              # Calendar, privacy, API, sync, encryption, and persistenc
 npm run typecheck
 npm run build
 npm run test:browser  # Installed Google Chrome by default on local macOS
+npx playwright install webkit
+npm run test:mobile   # Optional mobile checks in Safari’s WebKit engine
 ```
 
-For browser tests without installed Chrome, run `npx playwright install chromium` and `PLAYWRIGHT_CHANNEL=chromium npm run test:browser`. The browser suite starts an isolated fixture server and never reads `.env` or opens your real calendar database. Tests include mobile layout, password flows, and automated accessibility checks. Fixture events are never loaded into a production database.
+For browser tests without installed Chrome, run `npx playwright install chromium` and `PLAYWRIGHT_CHANNEL=chromium npm run test:browser`. The browser suite starts an isolated fixture server and never reads `.env` or opens your real calendar database. Tests cover 320–430px phone layouts, landscape, event sheets, touch panning and pinch zoom, password flows, and automated accessibility checks. Fixture events are never loaded into a production database.
 
 Local maintenance: `npm run admin -- backup /absolute/path/backup.sqlite` and `npm run admin -- reset-owner < /path/to/private-password-file`.
 
