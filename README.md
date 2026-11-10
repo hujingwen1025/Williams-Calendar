@@ -87,6 +87,7 @@ Remove the temporary password file afterward. All owner sessions are revoked. No
 - Click an event for permitted details, meeting links, organizer, attendees, recurrence information, and a copyable summary.
 - Authorized search and availability/status filters. Search runs **after privacy redaction**.
 - Named time zones, local-time display, 12/24-hour time, configurable week start, weekend visibility, working-hour shading, and a current-time indicator.
+- Calendar zoom from 50–400% stretches time slots and rows so compressed events have more room. Use the zoom buttons, `+`/`-`/`0` keys (zoom in/out/reset), Ctrl/Cmd + wheel, or pinch over the calendar. Browser page zoom shortcuts remain available. Zoom is saved with your display preferences; authorized location and description previews appear from 150%.
 - Mobile agenda default, keyboard shortcuts (`?` opens the guide), and print styles.
 - Display preferences stay in browser storage; passwords, source credentials, and detailed event data do not.
 - Owner preview shows exactly the public availability representation.

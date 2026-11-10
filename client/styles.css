@@ -1361,3 +1361,89 @@ label,
     padding: var(--space-2xs);
   }
 }
+
+/* Calendar zoom stretches layout geometry; typography and app chrome stay fixed. */
+.calendar-zoom-controls {
+  display: flex;
+  align-items: center;
+  border-inline-end: 1px solid var(--color-rule);
+  padding-inline-end: var(--space-xs);
+  margin-inline-end: var(--space-xs);
+}
+.zoom-reset {
+  min-width: 52px;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.calendar-sheet {
+  touch-action: pan-x pan-y;
+}
+.calendar-sheet .calendar-agenda-event {
+  min-height: max(44px, calc(48px * var(--calendar-zoom, 1)));
+}
+.calendar-sheet[data-expanded="true"] .event-title {
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+.calendar-sheet .calendar-year-month .calendar-day-inner {
+  min-height: calc(36px * var(--calendar-zoom, 1));
+}
+.event-preview {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  color: var(--color-ink-2);
+}
+.event-location {
+  -webkit-line-clamp: 2;
+}
+@media (max-width: 1150px) {
+  .calendar-toolbar .toolbar-utilities {
+    flex-basis: 100%;
+    justify-content: flex-end;
+    border-inline-start: 0;
+  }
+}
+@media (max-width: 640px) {
+  .calendar-toolbar .toolbar-utilities {
+    order: 3;
+    justify-content: flex-end;
+    border-top: 1px solid var(--color-rule);
+    padding-top: var(--space-xs);
+  }
+  .calendar-zoom-controls {
+    margin-inline-end: auto;
+  }
+  .calendar-sheet[data-expanded="true"]
+    .busy-event
+    .month-event-content
+    .event-title {
+    display: block;
+  }
+}
+.calendar-event {
+  overflow: hidden;
+}
+.calendar-sheet[data-timeline="true"] .calendar-event-inner {
+  align-items: flex-start;
+  min-height: 0;
+  overflow: hidden;
+}
+.calendar-sheet[data-timeline="true"] .event-content {
+  max-height: 100%;
+  width: 100%;
+  min-height: 0;
+}
+.calendar-event .compact-event-content {
+  padding: 0 var(--space-xs);
+  gap: 0;
+}
+.compact-event-content .event-title {
+  font-size: 11px;
+  line-height: 1.25;
+}

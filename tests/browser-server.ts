@@ -17,6 +17,10 @@ const busy = calendar(
     ),
   ].join("\r\n"),
 );
+const detailed = detailedFixture.replace(
+  "END:VCALENDAR",
+  `${event("UID:short-zoom-test\r\nDTSTART:20261109T031000Z\r\nDTEND:20261109T032000Z\r\nSUMMARY:Quick project check-in\r\nLOCATION:Focus room\r\nDESCRIPTION:Review next steps for the project.")}\r\nEND:VCALENDAR`,
+);
 const { app, store, sync } = await createApp(
   {
     dbPath: ":memory:",
@@ -38,7 +42,7 @@ const { app, store, sync } = await createApp(
       )
         throw new Error("The source could not be reached.");
       return {
-        text: source.url.includes("detailed") ? detailedFixture : busy,
+        text: source.url.includes("detailed") ? detailed : busy,
         notModified: false,
         etag: "fixture",
         modified: null,

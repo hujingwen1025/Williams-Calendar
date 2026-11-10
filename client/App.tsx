@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import FullCalendar, {
   type CalendarRef,
   type DatesSetInfo,
@@ -35,6 +42,8 @@ import {
   X,
   AlertCircle,
   Check,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import type {
   CalendarEvent,
@@ -46,6 +55,13 @@ import { Dialog } from "./components/Dialog";
 import { Login } from "./components/Login";
 import { Settings } from "./components/Settings";
 import { EventDetails } from "./components/EventDetails";
+import {
+  useCalendarZoom,
+  clampCalendarZoom,
+  MIN_CALENDAR_ZOOM,
+  MAX_CALENDAR_ZOOM,
+  CALENDAR_ZOOM_STEP,
+} from "./useCalendarZoom";
 const plugins = [
   dayGridPlugin,
   timeGridPlugin,
@@ -67,16 +83,21 @@ interface Preferences {
   hour12: boolean;
   weekends: boolean;
   weekStart?: number;
+  zoom: number;
 }
 function readPreferences(): Preferences {
   try {
+    const saved = JSON.parse(
+      localStorage.getItem("calendar-preferences") || "{}",
+    );
     return {
       hour12: false,
       weekends: true,
-      ...JSON.parse(localStorage.getItem("calendar-preferences") || "{}"),
+      ...saved,
+      zoom: clampCalendarZoom(saved?.zoom),
     };
   } catch {
-    return { hour12: false, weekends: true };
+    return { hour12: false, weekends: true, zoom: 100 };
   }
 }
 const dateInZone = (zone: string) =>
@@ -90,6 +111,7 @@ function validDate(date: string | null) {
 }
 export function App() {
   const calendar = useRef<CalendarRef>(null);
+  const calendarSheet = useRef<HTMLElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const initial = useMemo(() => new URLSearchParams(location.search), []);
   const [session, setSession] = useState<SessionInfo | null>(null);
@@ -132,6 +154,14 @@ export function App() {
   const timeZone =
     preferences.timeZone || session?.settings.timeZone || "Asia/Shanghai";
   const weekStart = preferences.weekStart ?? session?.settings.weekStart ?? 1;
+  const zoom = preferences.zoom;
+  const isTimeline = ["timeGridDay", "timeGridWeek", "workWeek"].includes(view);
+  const setZoom = useCalendarZoom(
+    calendarSheet,
+    zoom,
+    (value) => setPreferences((old) => ({ ...old, zoom: value })),
+    Boolean(session) && !modal,
+  );
   const loadSession = useCallback(async () => {
     const next = await api<SessionInfo>("/api/session");
     setCsrf(next.csrfToken);
@@ -292,6 +322,18 @@ export function App() {
       )
         return;
       const key = event.key.toLowerCase();
+      if (["+", "=", "-", "_", "0"].includes(key)) {
+        event.preventDefault();
+        setZoom(
+          key === "0"
+            ? 100
+            : zoom +
+                (["+", "="].includes(key)
+                  ? CALENDAR_ZOOM_STEP
+                  : -CALENDAR_ZOOM_STEP),
+        );
+        return;
+      }
       if (key === "/" && effectiveRole !== "public") {
         event.preventDefault();
         searchRef.current?.focus();
@@ -312,7 +354,7 @@ export function App() {
     }
     document.addEventListener("keydown", keyboard);
     return () => document.removeEventListener("keydown", keyboard);
-  }, [modal, effectiveRole, navigate, changeView]);
+  }, [modal, effectiveRole, navigate, changeView, zoom, setZoom]);
   async function lock() {
     setData(null);
     setSelected(null);
@@ -577,6 +619,40 @@ export function App() {
                 </label>
               </div>
               <div className="toolbar-utilities">
+                <div
+                  className="calendar-zoom-controls"
+                  role="group"
+                  aria-label="Calendar zoom"
+                >
+                  <button
+                    className="icon-button"
+                    aria-label="Zoom out calendar"
+                    title="Zoom out (-)"
+                    disabled={zoom <= MIN_CALENDAR_ZOOM}
+                    onClick={() => setZoom(zoom - CALENDAR_ZOOM_STEP)}
+                  >
+                    <ZoomOut size={18} />
+                  </button>
+                  <button
+                    className="text-button zoom-reset"
+                    aria-label={`Reset calendar zoom (${zoom}%)`}
+                    title="Reset zoom (0)"
+                    onClick={() => setZoom(100)}
+                  >
+                    <span aria-live="polite" aria-atomic="true">
+                      {zoom}%
+                    </span>
+                  </button>
+                  <button
+                    className="icon-button"
+                    aria-label="Zoom in calendar"
+                    title="Zoom in (+)"
+                    disabled={zoom >= MAX_CALENDAR_ZOOM}
+                    onClick={() => setZoom(zoom + CALENDAR_ZOOM_STEP)}
+                  >
+                    <ZoomIn size={18} />
+                  </button>
+                </div>
                 <button
                   className="icon-button"
                   aria-label="Display preferences"
@@ -703,7 +779,12 @@ export function App() {
               className={`calendar-layout ${selected ? "with-details" : ""}`}
             >
               <section
+                ref={calendarSheet}
                 className={`calendar-sheet ${view === "multiMonthYear" ? "year-sheet" : ""} ${!loading && !available && !isList ? "unavailable" : ""}`}
+                data-zoom={zoom}
+                data-expanded={zoom > 100}
+                data-timeline={isTimeline}
+                style={{ "--calendar-zoom": zoom / 100 } as CSSProperties}
                 aria-label={`${views.find((v) => v.id === view)?.label} calendar`}
                 aria-busy={loading}
               >
@@ -733,8 +814,20 @@ export function App() {
                   editable={false}
                   selectable={false}
                   datesSet={datesChanged}
-                  height={view === "multiMonthYear" || isList ? "auto" : 650}
-                  dayMaxEvents={3}
+                  height={
+                    view === "multiMonthYear" || isList
+                      ? "auto"
+                      : isTimeline
+                        ? 650
+                        : Math.round((650 * zoom) / 100)
+                  }
+                  slotMinHeight={Math.round((32 * zoom) / 100)}
+                  eventMinHeight={18}
+                  eventShortHeight={42}
+                  scrollTimeReset={false}
+                  singleMonthMinWidth={Math.round((320 * zoom) / 100)}
+                  dayCellInnerClass="calendar-day-inner"
+                  dayMaxEvents={zoom > 100 ? false : zoom === 100 ? 3 : true}
                   fixedWeekCount={false}
                   businessHours={{
                     daysOfWeek: [1, 2, 3, 4, 5],
@@ -786,11 +879,13 @@ export function App() {
                   singleMonthClass="calendar-year-month"
                   singleMonthHeaderClass="calendar-year-header"
                   eventBeforeClass="calendar-event-before"
+                  eventInnerClass="calendar-event-inner"
                   eventContent={(info) => (
                     <CalendarEventContent
                       info={info}
                       timeZone={timeZone}
                       hour12={preferences.hour12}
+                      expanded={zoom >= 150}
                     />
                   )}
                   noEventsContent={() => (
@@ -958,6 +1053,8 @@ export function App() {
                 ["/", "Search detailed events"],
                 ["Esc", "Close event details"],
                 ["?", "Open this guide"],
+                ["+ / −", "Zoom calendar in / out"],
+                ["0", "Reset calendar zoom"],
               ].map(([key, label]) => (
                 <div key={key}>
                   <dt>{label}</dt>
@@ -967,6 +1064,10 @@ export function App() {
                 </div>
               ))}
             </dl>
+            <p className="fine-print">
+              Pinch over the calendar, or hold Ctrl/Cmd while scrolling, to
+              zoom.
+            </p>
             <p className="fine-print">
               Events are managed in the original calendars. This website is a
               shared, read-only view.
@@ -1064,7 +1165,9 @@ export function App() {
             </label>
             <button
               className="button quiet"
-              onClick={() => setPreferences({ hour12: false, weekends: true })}
+              onClick={() =>
+                setPreferences({ hour12: false, weekends: true, zoom: 100 })
+              }
             >
               Reset display preferences
             </button>
@@ -1082,12 +1185,17 @@ function CalendarEventContent({
   info,
   timeZone,
   hour12,
+  expanded,
 }: {
   info: EventDisplayInfo;
   timeZone: string;
   hour12: boolean;
+  expanded: boolean;
 }) {
   const record = info.event.extendedProps.record as CalendarEvent | undefined;
+  const compact =
+    ["timeGridDay", "timeGridWeek", "workWeek"].includes(info.view.type) &&
+    info.isShort;
   const formatter = new Intl.DateTimeFormat("en", {
     timeZone,
     hour: "2-digit",
@@ -1101,10 +1209,10 @@ function CalendarEventContent({
   const label = `${info.event.title}${start ? `, ${start} – ${end}` : ", all day"}`;
   return (
     <div
-      className={`event-content ${info.view.type === "dayGridMonth" ? "month-event-content" : ""}`}
+      className={`event-content ${info.view.type === "dayGridMonth" ? "month-event-content" : ""} ${compact ? "compact-event-content" : ""}`}
       title={label}
     >
-      {start && (
+      {start && !compact && (
         <span className="event-time">
           <time dateTime={record?.start}>{start}</time>
           <span className="time-separator">to</span>
@@ -1112,6 +1220,20 @@ function CalendarEventContent({
         </span>
       )}
       <span className="event-title">{info.event.title}</span>
+      {expanded && !compact && record && !record.redacted && (
+        <>
+          {record.location && (
+            <span className="event-preview event-location">
+              {record.location}
+            </span>
+          )}
+          {record.description && (
+            <span className="event-preview event-description-preview">
+              {record.description}
+            </span>
+          )}
+        </>
+      )}
       {record?.redacted && <LockKeyhole size={11} className="event-lock" />}
     </div>
   );
