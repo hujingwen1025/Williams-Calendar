@@ -519,14 +519,13 @@ export function Settings({
                       id="viewer-password"
                       type="password"
                       autoComplete="new-password"
-                      minLength={12}
                       maxLength={256}
                       required
                       value={newPassword}
                       onChange={(event) => setNewPassword(event.target.value)}
                     />
                     <p className="text-label">
-                      At least 12 characters. Separate from upstream feed
+                      No minimum length. Separate from upstream feed
                       credentials.
                     </p>
                     <div className="button-row">

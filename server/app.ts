@@ -227,16 +227,20 @@ export async function createApp(
         .object({
           role: z.enum(["viewer", "owner"]),
           password: z.string().min(1).max(256),
+          rememberMe: z.boolean().default(false),
         })
         .parse(request.body);
       if (!(await verifyPassword(body.password, store.password(body.role))))
         throw new ApiError(401, "The password is incorrect.");
       if (request.cookies.wc_session)
         store.deleteSession(request.cookies.wc_session);
-      const session = store.createSession(body.role);
+      const rememberMe = body.role === "viewer" && body.rememberMe;
+      const session = store.createSession(body.role, rememberMe);
       reply.setCookie("wc_session", session.token, {
         ...cookieOptions,
-        expires: new Date(session.expires),
+        ...(body.role === "owner" || rememberMe
+          ? { expires: new Date(session.expires) }
+          : {}),
       });
       return {
         role: body.role,
@@ -335,7 +339,10 @@ export async function createApp(
       .parse((request.params as { role: string }).role);
     const body = z
       .object({
-        password: passwordSchema,
+        password:
+          target === "owner"
+            ? passwordSchema
+            : z.string().min(1, "Enter a visitor password.").max(256),
         currentPassword: z.string().max(256).optional(),
       })
       .parse(request.body);

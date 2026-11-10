@@ -152,10 +152,11 @@ export class Store {
       .get(digest(token), Date.now()) as
       { role: "viewer" | "owner"; csrf: string; expires: number } | undefined;
   }
-  createSession(role: "viewer" | "owner") {
+  createSession(role: "viewer" | "owner", rememberMe = false) {
     const token = randomToken();
     const csrf = randomToken();
-    const expires = Date.now() + (role === "owner" ? 8 : 12) * 60 * 60 * 1000;
+    const hours = role === "owner" ? 8 : rememberMe ? 30 * 24 : 12;
+    const expires = Date.now() + hours * 60 * 60 * 1000;
     this.db.prepare("DELETE FROM sessions WHERE expires <= ?").run(Date.now());
     this.db
       .prepare("INSERT INTO sessions(hash,role,csrf,expires) VALUES (?,?,?,?)")

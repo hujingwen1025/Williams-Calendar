@@ -13,6 +13,7 @@ export function Login({
 }) {
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   async function submit(event: FormEvent) {
@@ -23,6 +24,7 @@ export function Login({
       const result = await post<{ csrfToken: string }>("/api/auth/login", {
         role: owner ? "owner" : "viewer",
         password,
+        rememberMe: !owner && rememberMe,
       });
       setCsrf(result.csrfToken);
       setPassword("");
@@ -71,6 +73,16 @@ export function Login({
               {show ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
+          {!owner && (
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(event) => setRememberMe(event.target.checked)}
+              />
+              <span>Keep me signed in</span>
+            </label>
+          )}
           <p
             id="login-message"
             className="form-message error"
@@ -89,7 +101,9 @@ export function Login({
         </form>
         {!owner && (
           <p className="fine-print">
-            Read-only access. This session lasts up to 12 hours.
+            {rememberMe
+              ? "Read-only access. Remember this browser for 30 days."
+              : "Read-only access. This session lasts up to 12 hours."}
           </p>
         )}
       </div>

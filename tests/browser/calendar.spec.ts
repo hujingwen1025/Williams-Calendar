@@ -1,7 +1,11 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 const pageUrl = "/?view=dayGridMonth&date=2026-11-09";
-async function login(page: import("@playwright/test").Page, owner = false) {
+async function login(
+  page: import("@playwright/test").Page,
+  owner = false,
+  options: { password?: string; rememberMe?: boolean } = {},
+) {
   await page
     .getByRole("button", {
       name: owner ? "Owner sign-in" : "View details",
@@ -10,7 +14,12 @@ async function login(page: import("@playwright/test").Page, owner = false) {
     .click();
   await page
     .getByLabel(owner ? "Owner password" : "Calendar password", { exact: true })
-    .fill(owner ? "browser-owner-password" : "browser-viewer-password");
+    .fill(
+      options.password ??
+        (owner ? "browser-owner-password" : "browser-viewer-password"),
+    );
+  if (options.rememberMe)
+    await page.getByRole("checkbox", { name: "Keep me signed in" }).check();
   await page
     .getByRole("dialog")
     .getByRole("button", {
@@ -67,6 +76,11 @@ test("password details, redaction, search, event panel, and relocking", async ({
   await page.goto(pageUrl);
   await login(page);
   await expect(page.getByText("Design review", { exact: true })).toBeVisible();
+  expect(
+    (await page.context().cookies()).find(
+      (cookie) => cookie.name === "wc_session",
+    )?.expires,
+  ).toBe(-1);
   await expect(
     page.getByText("Secret medical appointment", { exact: true }),
   ).toHaveCount(0);
@@ -173,4 +187,68 @@ test("public calendar has no critical or serious accessibility violations", asyn
       ["critical", "serious"].includes(v.impact || ""),
     ),
   ).toEqual([]);
+});
+
+test("short visitor passwords and remembering access across browser contexts", async ({
+  page,
+  browser,
+}) => {
+  await page.goto(pageUrl);
+  await login(page, true);
+  await expect(
+    page.getByRole("checkbox", { name: "Keep me signed in" }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Access & security", exact: true })
+    .click();
+  await page.getByLabel("New shared calendar password").fill("1");
+  await page
+    .getByRole("button", { name: "Set viewer password", exact: true })
+    .click();
+  await expect(
+    page.getByText(
+      "Viewer password changed. Previous viewer sessions have been revoked.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Close dialog" }).click();
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await login(page, false, { password: "1", rememberMe: true });
+  await expect(page.getByText("Design review", { exact: true })).toBeVisible();
+  const state = await page.context().storageState();
+  const cookie = state.cookies.find((cookie) => cookie.name === "wc_session")!;
+  expect(cookie.expires * 1000 - Date.now()).toBeGreaterThan(29 * 86400_000);
+  const restored = await browser.newContext({ storageState: state });
+  try {
+    const nextPage = await restored.newPage();
+    await nextPage.goto(pageUrl);
+    await expect(
+      nextPage.getByText("Design review", { exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Lock calendar", exact: true })
+      .click();
+    await nextPage.reload();
+    await expect(
+      nextPage.getByText("Design review", { exact: true }),
+    ).toHaveCount(0);
+  } finally {
+    await restored.close();
+  }
+  await login(page, true);
+  await page
+    .getByRole("button", { name: "Access & security", exact: true })
+    .click();
+  await page
+    .getByLabel("New shared calendar password")
+    .fill("browser-viewer-password");
+  await page
+    .getByRole("button", { name: "Set viewer password", exact: true })
+    .click();
+  await expect(
+    page.getByText(
+      "Viewer password changed. Previous viewer sessions have been revoked.",
+      { exact: true },
+    ),
+  ).toBeVisible();
 });

@@ -174,16 +174,22 @@ export function App() {
   }, [loadSession]);
   useEffect(() => {
     if (!session?.expiresAt) return;
-    const timer = setTimeout(
-      () => {
-        setSelected(null);
-        setData(null);
-        void loadSession().catch(() => {
-          setSession(null);
-        });
-      },
-      Math.max(0, Date.parse(session.expiresAt) - Date.now()),
-    );
+    const expiresAt = Date.parse(session.expiresAt);
+    let timer: ReturnType<typeof setTimeout>;
+    function checkExpiry() {
+      const remaining = expiresAt - Date.now();
+      if (remaining > 0) {
+        // Browsers clamp delays longer than about 24.8 days to 1 ms.
+        timer = setTimeout(checkExpiry, Math.min(remaining, 2_147_483_647));
+        return;
+      }
+      setSelected(null);
+      setData(null);
+      void loadSession().catch(() => {
+        setSession(null);
+      });
+    }
+    checkExpiry();
     return () => clearTimeout(timer);
   }, [session?.expiresAt, loadSession]);
   useEffect(() => {

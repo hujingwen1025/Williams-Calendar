@@ -55,9 +55,14 @@ function client(app: FastifyInstance) {
       password = role === "owner"
         ? config.ownerPassword!
         : "viewer-test-password",
+      rememberMe = false,
     ) {
       await this.request("GET", "/api/session");
-      return this.request("POST", "/api/auth/login", { role, password });
+      return this.request("POST", "/api/auth/login", {
+        role,
+        password,
+        rememberMe,
+      });
     },
   };
 }
@@ -191,7 +196,7 @@ describe("API access boundaries and synchronization", () => {
   });
   it("revokes viewer sessions on password rotation, disabling details, logout, and expiry", async () => {
     const viewer = client(app);
-    await viewer.login("viewer");
+    await viewer.login("viewer", undefined, true);
     const owner = client(app);
     await owner.login("owner");
     expect(
@@ -213,6 +218,65 @@ describe("API access boundaries and synchronization", () => {
     await viewer.login("viewer");
     await viewer.request("POST", "/api/auth/logout");
     expect((await viewer.request("GET", eventsUrl)).json().role).toBe("public");
+  });
+  it("allows one-character visitor passwords but still rejects empty passwords and short owner passwords", async () => {
+    const owner = client(app);
+    await owner.login("owner");
+    expect(
+      (
+        await owner.request("PUT", "/api/owner/passwords/viewer", {
+          password: "1",
+        })
+      ).statusCode,
+    ).toBe(200);
+    const viewer = client(app);
+    expect((await viewer.login("viewer", "1")).statusCode).toBe(200);
+    expect((await viewer.request("GET", eventsUrl)).json().role).toBe("viewer");
+    expect(
+      (
+        await owner.request("PUT", "/api/owner/passwords/viewer", {
+          password: "",
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await owner.request("PUT", "/api/owner/passwords/owner", {
+          password: "1",
+          currentPassword: config.ownerPassword,
+        })
+      ).statusCode,
+    ).toBe(400);
+  });
+  it.each([false, true])(
+    "uses the appropriate viewer cookie and lifetime when rememberMe=%s",
+    async (rememberMe) => {
+      const viewer = client(app);
+      const before = Date.now();
+      const response = await viewer.login("viewer", undefined, rememberMe);
+      expect(response.statusCode).toBe(200);
+      const lifetime = (rememberMe ? 30 * 24 : 12) * 60 * 60 * 1000;
+      const expires = Date.parse(response.json().expiresAt);
+      expect(expires).toBeGreaterThanOrEqual(before + lifetime);
+      expect(expires).toBeLessThanOrEqual(Date.now() + lifetime);
+      const headers = response.headers["set-cookie"];
+      const sessionCookie = (Array.isArray(headers) ? headers : [headers]).find(
+        (value) => value?.startsWith("wc_session="),
+      )!;
+      expect(sessionCookie).toContain("HttpOnly");
+      expect(sessionCookie).toContain("SameSite=Strict");
+      if (rememberMe) expect(sessionCookie).toContain("Expires=");
+      else expect(sessionCookie).not.toMatch(/Expires=|Max-Age=/i);
+    },
+  );
+  it("does not extend owner sessions when a client submits rememberMe", async () => {
+    const owner = client(app);
+    const before = Date.now();
+    const response = await owner.login("owner", undefined, true);
+    expect(response.statusCode).toBe(200);
+    const expires = Date.parse(response.json().expiresAt);
+    expect(expires).toBeGreaterThanOrEqual(before + 8 * 60 * 60 * 1000);
+    expect(expires).toBeLessThanOrEqual(Date.now() + 8 * 60 * 60 * 1000);
   });
   it("rate-limits password attempts and rejects incorrect passwords", async () => {
     const viewer = client(app);
